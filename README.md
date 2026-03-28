@@ -16,5 +16,6 @@ How to install
 5. Click "+" icon and select "Upload a skill"
 6. Upload the skill.md file.
 
-7. #Requirements
-8. - Google Chrome Claude extension installed to screenshot device screen.
+7. Requirements
+8. 
+9. - Google Chrome Claude extension installed to screenshot device screen.
