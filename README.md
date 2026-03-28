@@ -16,6 +16,7 @@ How to install
 4. Click "Skills"
 5. Click "+" icon and select "Upload a skill"
 6. Upload the skill.md file.
+7. Ask Claude/Codex or LLM to use 
 
 Requirements
  
