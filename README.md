@@ -1,8 +1,8 @@
 # Schwung-module-build-skill
 Build and troubleshoot modules with Claude.
 
-Abilities
-Besides knowing how to build a module it can also:
+#Abilities
+Besides knowing how to build a module with specific requirement, it can also:
 - Clear cache and restart your Ableton Move device. 
 - Access the screen mirroring functionality (requires Claude extension for Chrome) to screenshot the device screen, save the screenshot and view the image for troubleshooting. 
 
