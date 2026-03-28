@@ -1,5 +1,5 @@
 # Schwung Module Creator skill
-Build and troubleshoot modules with Claude while reducing token usage.
+Build and troubleshoot Schwung modules with Claude (or any agentic workflow) with the intention to create a closed developement loop and reducing token usage.
 
 Abilities
 
