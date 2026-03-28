@@ -1,4 +1,4 @@
-# Schwung-module-build-skill
+# Schwung Module Creator skill
 Build and troubleshoot modules with Claude while reducing token usage.
 
 Abilities
