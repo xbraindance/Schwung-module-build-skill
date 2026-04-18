@@ -1,0 +1,156 @@
+# Native DSP Plugin (C/C++)
+
+**When to load:** writing or debugging a native audio/MIDI plugin (`.so`), defining parameters, bridging runtime-discovered data between DSP and UI, or parsing MIDI files inside the DSP.
+
+## Wiki first
+- `schwung-wiki/patterns/dsp-patterns.md` — int16 audio, filters, gain, clipping, ZOH, quantization
+- `schwung-wiki/gotchas/device-constraints.md` — no `/tmp`, block size = 128 frames, LED buffer limits
+- `schwung-wiki/patterns/enum-handling.md` — `find_enum` vs `parse_enum`
+- `schwung-wiki/patterns/state-serialization.md` — `get_param`/`set_param` bridge to UI
+- BD-1200: `dsp/input-anti-aliasing-filter.md`, `dsp/sample-and-hold-jitter.md`, `circuits/sp1200-drive-saturation.md`, `filters/pitch-and-filter-investigation.md`, `implementation/bd1200-signal-chain.md`
+
+Authoritative: `schwung-main/docs/MODULES.md` (Native DSP Plugin, JS↔DSP Communication, Chain Parameters) + `SPI_PROTOCOL.md` (audio format).
+
+## Audio format (fixed)
+
+- 44 100 Hz, **128 frames per block** (~2.9 ms), stereo interleaved int16 little-endian: `[L0, R0, L1, R1, …, L127, R127]`
+- Host master volume is applied **after** your `process()` / `render_block()` — don't pre-scale above int16 range
+- No variable block sizes
+
+## Pick the right API for your component type
+
+There are **three** DSP APIs. Exporting the wrong entry symbol = silent load failure.
+
+| `component_type` | Struct | Entry symbol |
+|---|---|---|
+| `sound_generator` | `plugin_api_v2_t` (api_version = 2) | `move_plugin_init_v2` |
+| `audio_fx` | `audio_fx_api_v2_t` (api_version = 2) | `move_audio_fx_init_v2` |
+| `midi_fx` | `midi_fx_api_v1_t` (api_version = 1) | `move_midi_fx_init` |
+
+The module.json `api_version: 2` is separate from the DSP struct's `api_version` — the former gates multi-instance + Signal Chain, the latter identifies the ABI.
+
+### Sound generator / audio FX (v2)
+```c
+#include "host/plugin_api_v1.h"
+
+static void render_block(void *inst, int16_t *out_lr, int frames) {
+    /* 128 stereo frames */
+}
+static plugin_api_v2_t api = {
+    .api_version = 2,
+    .create_instance = create_instance,
+    .destroy_instance = destroy_instance,
+    .on_midi = on_midi,
+    .set_param = set_param,
+    .get_param = get_param,
+    .render_block = render_block,
+};
+plugin_api_v2_t* move_plugin_init_v2(const host_api_v1_t *host) { return &api; }
+```
+
+### MIDI FX (v1 — different struct and signature)
+```c
+typedef struct midi_fx_api_v1 {
+    uint32_t api_version;  /* must be 1 */
+    void* (*create_instance)(const char *module_dir, const char *config_json);
+    void  (*destroy_instance)(void *inst);
+    int   (*process_midi)(void *inst, const uint8_t *in_msg, int in_len,
+                          uint8_t out_msgs[][3], int out_lens[], int max_out);
+    int   (*tick)(void *inst, int frames, int sample_rate,
+                  uint8_t out_msgs[][3], int out_lens[], int max_out);
+    void  (*set_param)(void *inst, const char *key, const char *val);
+    int   (*get_param)(void *inst, const char *key, char *buf, int buf_len);
+} midi_fx_api_v1_t;
+midi_fx_api_v1_t* move_midi_fx_init(const host_api_v1_t *host);
+```
+
+`process_midi` handles one incoming message and emits up to `max_out` outgoing messages; `tick` emits unsolicited messages on a timer.
+
+## Host pointer lifecycle
+
+The `host_api_v1_t *host` passed to `create_instance` / `_init` is **not guaranteed to outlive the call**. Use it immediately (e.g., `host->log("init")`) but do not store the bare pointer for later reference — access host facilities through the callbacks exposed on your own struct.
+
+## Parameter bridge — `set_param` / `get_param`
+
+String-based; everything is `const char *`. JS calls `host_module_set_param(key, val)` and `host_module_get_param(key)`; those land in your two callbacks.
+
+### The `parse_enum` trap
+Don't write this:
+```c
+static int parse_enum(const char **names, int count, const char *val) {
+    int v = find_enum(names, count, val);
+    if (v >= 0) return v;
+    v = atoi(val);                                 /* atoi("C01") → 0 */
+    return (v >= 0 && v < count) ? v : 0;
+}
+```
+Any custom string that happens to start with a non-digit falls back through `atoi()` to 0 — your "custom chord C01" silently becomes the first built-in. Use `find_enum` (returns -1 on miss) and then check extended lists explicitly.
+
+## UI ↔ DSP for runtime-discovered data
+
+The UI has no filesystem access. To expose counts/names of things the DSP discovered on disk:
+
+DSP:
+```c
+if (strcmp(key, "custom_chord_count") == 0)
+    return snprintf(buf, buf_len, "%d", inst->custom_chord_count);
+if (strcmp(key, "custom_chord_names") == 0) {
+    int pos = 0;
+    for (int i = 0; i < inst->custom_chord_count; i++) {
+        if (i > 0) buf[pos++] = ',';
+        pos += snprintf(buf+pos, buf_len-pos, "%s", inst->custom_chords[i].name);
+    }
+    return pos;
+}
+```
+UI:
+```js
+const count = parseInt(dspGet('custom_chord_count')) || 0;
+const names = count ? dspGet('custom_chord_names').split(',') : [];
+EDIT_ENUMS.chord_type = [...BUILTIN_CHORDS, ...names];
+```
+
+## Signal Chain metadata
+
+Return from `get_param`:
+- `"chain_params"` — JSON array of knob-mappable params. Keys **must** match `set_param`/`get_param` keys exactly.
+- `"ui_hierarchy"` — nested menu tree for Shadow UI. May be stateful (hide items conditionally).
+
+See `references/signal-chain.md` for exact shapes.
+
+## File I/O from the DSP
+
+`create_instance(module_dir, ...)` receives the absolute install path (e.g. `/data/UserData/schwung/modules/midi_fx/<id>/`). **Always** build paths relative to `module_dir`; never hardcode `/tmp` (rootfs is ~463 MB and almost always 100% full — writes crash the device).
+
+```c
+snprintf(inst->preset_dir, sizeof inst->preset_dir, "%s/presets/", module_dir);
+```
+
+Scan once at `create_instance` time — don't `opendir` per frame.
+
+## MIDI file parsing essentials
+
+If your module ingests `.mid` files:
+- Variable-length delta times: each byte with MSB set continues; final byte has MSB clear
+- Running status: data bytes < 0x80 reuse the previous status byte
+- Note-on with velocity 0 == note-off (handle both 0x80-0x8F and 0x90-0x9F)
+- Skip meta events (`0xFF`) and SysEx (`0xF0` / `0xF7`) by reading their length and jumping past
+- Cap accepted file size at ~8 KB for chord/pattern files
+
+## Preset save/load
+
+Store enum values as **strings**, not indices — so custom values (e.g. user-loaded chords) survive round-trips even if the list shrinks. On load, look up by name; fall back to a sane default if the string is unknown.
+
+## Realtime-path rules
+
+These are load-bearing — see `references/realtime.md` for the full story:
+
+- No `fprintf`, `fopen`, file I/O in `render_block` / `process_midi`
+- No `malloc`/`new` in the hot path — pre-allocate in `create_instance`
+- `host->log("fmt", …)` is lock-free-ish but still ~1 ms per call; avoid in tight inner loops
+
+## Debug
+
+- Verify entry symbol: `nm -D dsp.so | grep -E 'move_plugin_init_v2|move_audio_fx_init_v2|move_midi_fx_init'`
+- DSP crashes silently on-device → enable logging (`references/deploy-debug.md`) and tail `/data/UserData/schwung/debug.log`
+- Parameter mismatches: the UI sees the raw string; log it on the DSP side and compare
