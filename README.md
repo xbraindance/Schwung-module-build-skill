@@ -227,7 +227,7 @@ All without leaving Claude. 🚀
 
 ## What's New (Latest Update)
 
-**Version: 2.0.0 - UI Development Guide Integration**
+**Version: 0.2 - UI Development Guide Integration**
 
 This update significantly expands skill.md to be a complete, self-contained reference:
 
@@ -311,42 +311,6 @@ This update significantly expands skill.md to be a complete, self-contained refe
   ```bash
   bash ~/.claude/skills/schwung-module-creator/scripts/skill-update.sh
   ```
-
----
-
-## Advanced: Custom Configuration
-
-### Change Auto-Update Check Interval
-
-In `scripts/skill-update.sh`, change this line:
-```bash
-CHECK_INTERVAL=3600  # 1 hour
-# Change to:
-CHECK_INTERVAL=1800  # 30 minutes
-# or
-CHECK_INTERVAL=86400 # 1 day
-```
-
-### Disable Auto-Update
-
-Comment out the hook in `~/.claude/settings.json`:
-```json
-{
-  "hooks": {
-    // "skill:invoke": { ... }  // Disabled
-  }
-}
-```
-
-### Use a Different GitHub Branch
-
-Edit `scripts/skill-update.sh` and change:
-```bash
-GITHUB_RAW_URL="https://raw.githubusercontent.com/xbraindance/Schwung-Module-Creator-skill/main/skill.md"
-# to your fork/branch:
-GITHUB_RAW_URL="https://raw.githubusercontent.com/YOUR_USER/YOUR_FORK/develop/skill.md"
-```
-
 ---
 
 ## Skill Content Overview
