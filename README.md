@@ -295,24 +295,6 @@ This update significantly expands skill.md to be a complete, self-contained refe
 - Run: `ssh root@move.local 'reboot'`
 - Old `.so` stays in memory until reboot (Linux dlopen behavior)
 
-### Auto-update not working
-
-**Solution:**
-- Check hook is in `~/.claude/settings.json`:
-  ```bash
-  cat ~/.claude/settings.json | grep -A 3 "skill:invoke"
-  ```
-- Verify script is executable:
-  ```bash
-  ls -l ~/.claude/skills/schwung-module-creator/scripts/skill-update.sh
-  # Should show: -rwxr-xr-x
-  ```
-- Test manually:
-  ```bash
-  bash ~/.claude/skills/schwung-module-creator/scripts/skill-update.sh
-  ```
----
-
 ## Skill Content Overview
 
 The skill.md file now includes everything you need for Schwung development:
