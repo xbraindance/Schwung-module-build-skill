@@ -2,11 +2,17 @@
 
 **When to load:** forking Schwung, modifying the shim/host, changing shared-memory struct layout, or debugging cross-process issues. **Module authors rarely need this file** — if you're just building a module, skip.
 
-## Wiki first
-- `schwung-wiki/schwung-architecture-overview.md`
-- `schwung-wiki/schwung-hardware-api-reference.md`
+## Authoritative upstream
+- https://github.com/charlesvestal/schwung/tree/main/docs —
+  `SPI_PROTOCOL.md`, `REALTIME_SAFETY.md`, `MIDI_INJECTION.md`,
+  and any `LINK_AUDIO*` / `GAIN_STAGING*` files currently shipped.
+- `CLAUDE.md` at repo root — Gain Staging and Link Audio sections.
+- Source: `src/schwung_shim.c`, `src/host/module_manager.c`,
+  `src/host/link_audio.h`, `src/host/link_subscriber.cpp`.
 
-Authoritative: `schwung-main/docs/ARCHITECTURE.md`, `FORKING.md`, `SPI_PROTOCOL.md`, `LINK_AUDIO_WIRE_FORMAT.md`, `GAIN_STAGING_ANALYSIS.md`.
+Optional private notes (may not exist on your machine):
+`schwung-wiki/schwung-architecture-overview.md`,
+`schwung-wiki/schwung-hardware-api-reference.md`.
 
 ## Four-layer bootstrap
 
@@ -32,11 +38,21 @@ Authoritative: `schwung-main/docs/ARCHITECTURE.md`, `FORKING.md`, `SPI_PROTOCOL.
 
 ## Link Audio (per-track capture)
 
-- UDP `chnnlsv` protocol; ~353 packets/sec per channel, 5 channels total (one per Move track)
-- `sendto()` hook in the shim intercepts Move's stream and feeds ring buffers for the shadow FX chain
-- Gated by `link_audio_enabled: true` in `features.json`
-- Native sampler bridge injects the Schwung mix into Move's sampler input — requires `Resample Src = Replace` and sampler source = `Line In` on the Move UI
-- Design details: `plans/2026-02-12-link-audio-interception-design.md`
+As of the 2026-04 migration to the official `abl_link` audio C API,
+reception is handled by a separate sidecar process, not by a shim hook:
+
+- `src/host/link_subscriber.cpp` subscribes to Move's `1-MIDI…4-MIDI`
+  and `Main` Link Audio channels and writes samples into a
+  `/schwung-link-in` SPSC ring (5 slots).
+- The shim (`schwung_shim.c`) is a **reader** of that SHM, not an
+  interceptor. It feeds the shadow chain mixer from there.
+- The sidecar also publishes shadow-slot output back to Live as `ME-N`
+  channels via `/schwung-pub-audio` → `LinkAudioSink`s.
+- Feature gate: `link_audio_enabled: true` in `features.json`.
+- The earlier `sendto()` / `chnnlsv` UDP interception path was deleted
+  in that migration — don't expect to find it in the current shim.
+
+Design docs: upstream `docs/plans/2026-04-17-link-audio-official-api-migration.md`.
 
 ## Master FX gain staging (known issue)
 

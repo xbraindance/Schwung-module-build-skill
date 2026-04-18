@@ -2,12 +2,17 @@
 
 **When to load:** routing MIDI from pads / knobs / USB, sending MIDI out, debugging echo / injection issues, or handling raw MIDI.
 
-## Wiki first
-- `schwung-wiki/patterns/midi-handling.md` — MIDI FX API, `process_midi`, `tick`, routing, file parsing
-- `schwung-wiki/patterns/enum-handling.md` — dynamic MIDI-driven enums
-- `schwung-wiki/schwung-hardware-api-reference.md` — pad/knob/button CC mapping
+## Authoritative upstream
+- `docs/API.md` (MIDI section)
+  — https://github.com/charlesvestal/schwung/blob/main/docs/API.md
+- `docs/MIDI_INJECTION.md` — echo filter, safety, 8-byte stride
+- `docs/SPI_PROTOCOL.md` — 8-byte MIDI_IN event format
+- Hardware CC/note constants: `src/shared/constants.mjs`
 
-Authoritative: `schwung-main/docs/API.md` (MIDI section), `MIDI_INJECTION.md` (echo filter, safety), `SPI_PROTOCOL.md` (8-byte event format).
+Optional private notes (may not exist on your machine):
+`schwung-wiki/patterns/midi-handling.md`,
+`schwung-wiki/patterns/enum-handling.md`,
+`schwung-wiki/schwung-hardware-api-reference.md`.
 
 ## Cable routing
 

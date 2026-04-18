@@ -2,10 +2,14 @@
 
 **When to load:** creating a new module skeleton, editing `module.json`, choosing `component_type`, adding capabilities, or debugging silent load failures ("my module doesn't appear in the picker").
 
-## Wiki first
-- `schwung-wiki/framework/module-json-rules.md` — required fields, capability flags, common errors
-- `schwung-wiki/gotchas/module-loading-failures.md` — silent-failure triage
-- Authoritative: `schwung-main/docs/MODULES.md` → Module Structure, Capabilities, Tool Config, Defaults
+## Authoritative upstream
+- `docs/MODULES.md` → Module Structure, Capabilities, Tool Config, Defaults
+  — https://github.com/charlesvestal/schwung/blob/main/docs/MODULES.md
+- `CLAUDE.md` (repo root) — component types, signal chain integration
+- Host-side parser: `src/host/module_manager.c`
+
+Optional private notes (may not exist on your machine): local
+`schwung-wiki/framework/module-json-rules.md`, `schwung-wiki/gotchas/module-loading-failures.md`.
 
 ## JSON parser constraints (the minimal parser is picky)
 
@@ -24,11 +28,16 @@ Validate locally: `python3 -c 'import json; json.load(open("module.json"))'`
 | `id` | Directory-safe; must match the installed folder name |
 | `name` | Shown in picker |
 | `version` | SemVer |
-| `api_version` | **Always `2`** for new modules. Required for multi-instance + Signal Chain. |
 | `component_type` | Drives install path + which DSP entry symbol the host looks up |
-| `builtin` | Must be present and `false` for user-installed modules |
 
-Optional: `abbrev` (3-6 chars, shown in Signal Chain slot view), `description`, `author`, `ui`, `ui_chain`, `dsp`, `defaults`, `assets`.
+Optional but recommended:
+
+| Field | Notes |
+|---|---|
+| `api_version` | Defaults to `1` if omitted. Use `2` for native DSP plugins that want multi-instance (`create_instance`/`destroy_instance`). The module.json field is separate from the DSP struct's `api_version` — see `references/dsp.md`. |
+| `abbrev` | 3-6 chars, shown in Signal Chain slot view |
+| `builtin` | Only the chain UI reads this, defaulting to `false`. Safe to omit for user-installed modules. |
+| `description`, `author`, `ui`, `ui_chain`, `dsp`, `defaults`, `assets`, `scan_packs`, `requires_path` | See upstream `docs/MODULES.md` |
 
 ## Component type → install path + DSP API
 
@@ -59,7 +68,7 @@ Declared inside `"capabilities": { ... }`:
 | `claims_master_knob` | Volume knob automation disabled for this module; CC 79 goes to the module instead |
 | `raw_midi` | Bypass **all** host transforms (velocity curve, aftertouch deadzone, knob-touch filter for notes 0-9). Not selective. |
 | `raw_ui` | Module owns the Back button; you must call `host_return_to_menu()` yourself |
-| `chainable` | Module appears in Signal Chain. **Must be declared at top level AND inside `capabilities`** or it silently won't appear in the picker |
+| `chainable` | Module appears in Signal Chain. Declared **inside `capabilities`** — a top-level `chainable` field is ignored by the chain UI. |
 | `skip_led_clear` | Host does not clear LEDs on load/unload (preserve Move colors) |
 
 ## Assets (for modules with user-uploadable files)
@@ -98,9 +107,8 @@ Tool modules must call `host_exit_module()` on Back — calling it from any non-
 When a module doesn't show up in the picker:
 
 1. JSON syntax invalid (comments? trailing commas? single quotes?) — validate with Python
-2. `api_version` missing or not `2`
-3. `component_type` doesn't match the actual install path
-4. `chainable` set in only one of the two required locations
-5. DSP `.so` present but exports the wrong entry symbol for this `component_type` (`nm -D dsp.so | grep init`)
-6. `builtin: false` missing
-7. `module.json` > 8 KB
+2. `component_type` doesn't match the actual install path
+3. `chainable` declared at top level instead of inside `capabilities` (only the nested form is read)
+4. DSP `.so` present but exports the wrong entry symbol for this `component_type` (`nm -D dsp.so | grep init`)
+5. `api_version: 2` declared but the DSP doesn't actually implement `create_instance`/`destroy_instance`
+6. `module.json` > 8 KB

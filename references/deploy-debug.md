@@ -2,13 +2,17 @@
 
 **When to load:** building the module, deploying to Move, watching logs, using the display mirror, enabling/disabling verbose logging, or debugging install-path mismatches.
 
-## Wiki first
-- `schwung-wiki/framework/deploy-patterns.md` — build → deploy → verify cycle (tested across multiple modules)
-- `schwung-wiki/gotchas/deployment-path-gotchas.md` — cache invalidation, wrong deploy paths
-- `schwung-wiki/gotchas/build-issues.md` — Docker, cross-compilation, `.so` naming, tarball structure
-- BD-1200: `implementation/signal-chain-loading-gotchas.md` — `.so` must be executable, chain-v2 hardcoded filename
+## Authoritative upstream
+- `docs/LOGGING.md` — unified logger, enable/disable, format
+  — https://github.com/charlesvestal/schwung/blob/main/docs/LOGGING.md
+- `BUILDING.md` — build system, cross-compilation
+- `scripts/build.sh`, `scripts/install.sh` at the repo root
 
-Authoritative: `schwung-main/docs/LOGGING.md`, `ARCHITECTURE.md` (Layer 1 install), `FORKING.md` (build conventions).
+Optional private notes (may not exist on your machine):
+`schwung-wiki/framework/deploy-patterns.md`,
+`schwung-wiki/gotchas/deployment-path-gotchas.md`,
+`schwung-wiki/gotchas/build-issues.md`,
+`BD-1200/implementation/signal-chain-loading-gotchas.md`.
 
 ## Build
 
@@ -111,7 +115,7 @@ LOG_WARN("my-dsp", "...");
 LOG_ERROR("my-dsp", "...");
 ```
 
-Or use the `host->log(fmt, …)` callback passed into `create_instance` — prefer this from the DSP as it's lock-free-ish. Still avoid calling it in tight loops — see `references/realtime.md`.
+Or use the `host->log(msg)` callback passed into `_init` / `create_instance`. Signature is single-arg `const char *` — for printf-style formatting use `snprintf` into a local buffer first, or use the `LOG_*` macros above. It is **not** realtime-safe — never call from `render_block` / `process_midi`. See `references/realtime.md`.
 
 **Never** log from inside `render_block` / SPI callback path — that's the fastest way to cause audio dropouts.
 

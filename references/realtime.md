@@ -2,11 +2,13 @@
 
 **When to load:** diagnosing audio dropouts/glitches, writing code that runs inside `render_block` / `process_midi` / SPI callback path, spawning child processes, or pinning CPU-heavy modules.
 
-## Wiki first
-- `schwung-wiki/gotchas/device-constraints.md` — LED buffer, block size, `/tmp` trap
-- `schwung-wiki/features/` — audio perf write-ups
+## Authoritative upstream
+- `docs/REALTIME_SAFETY.md` — FIFO scheduling, SPI budget, root-cause analysis
+  — https://github.com/charlesvestal/schwung/blob/main/docs/REALTIME_SAFETY.md
+- `docs/SPI_PROTOCOL.md` — buffer layout, rate limits
 
-Authoritative: `schwung-main/docs/REALTIME_SAFETY.md`, `SPI_PROTOCOL.md` (rate limiting, implementation notes), plus the plans `2026-03-28-integrate-jack-and-rnbo-runner.md` and `2026-03-30-jack-double-buffer.md`.
+Optional private notes (may not exist on your machine):
+`schwung-wiki/gotchas/device-constraints.md`, `schwung-wiki/features/`.
 
 ## Budget
 
@@ -25,7 +27,7 @@ Authoritative: `schwung-main/docs/REALTIME_SAFETY.md`, `SPI_PROTOCOL.md` (rate l
 - More than ~16 MIDI injections per tick → SIGABRT
 - String formatting into large buffers
 
-`host->log("fmt", …)` is lock-free-ish via snapshot + background drain, but still ~1 ms per call — never log in an inner sample loop.
+`host->log(msg)` takes a single `const char *` (not variadic — see `references/dsp.md`). It wraps `fprintf` and is **not** realtime-safe. Never call it from `render_block` / `process_midi` / SPI callback, regardless of rate.
 
 ## Scheduling
 
