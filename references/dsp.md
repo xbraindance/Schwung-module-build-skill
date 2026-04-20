@@ -2,14 +2,15 @@
 
 **When to load:** writing or debugging a native audio/MIDI plugin (`.so`), defining parameters, bridging runtime-discovered data between DSP and UI, or parsing MIDI files inside the DSP.
 
-## Wiki first
-- `schwung-wiki/patterns/dsp-patterns.md` — int16 audio, filters, gain, clipping, ZOH, quantization
-- `schwung-wiki/gotchas/device-constraints.md` — no `/tmp`, block size = 128 frames, LED buffer limits
-- `schwung-wiki/patterns/enum-handling.md` — `find_enum` vs `parse_enum`
-- `schwung-wiki/patterns/state-serialization.md` — `get_param`/`set_param` bridge to UI
-- BD-1200: `dsp/input-anti-aliasing-filter.md`, `dsp/sample-and-hold-jitter.md`, `circuits/sp1200-drive-saturation.md`, `filters/pitch-and-filter-investigation.md`, `implementation/bd1200-signal-chain.md`
+## Authoritative upstream
+- `docs/MODULES.md` (Native DSP Plugin, JS↔DSP Communication, Chain Parameters)
+  — https://github.com/charlesvestal/schwung/blob/main/docs/MODULES.md
+- `docs/SPI_PROTOCOL.md` (audio buffer layout)
+- Header: `src/host/plugin_api_v1.h`, `src/host/audio_fx_api_v2.h`, `src/host/midi_fx_api_v1.h`
+- Reference DSPs to copy from: `src/modules/audio_fx/freeverb/freeverb.c`, `src/modules/sound_generators/linein/linein.c`
 
-Authoritative: `schwung-main/docs/MODULES.md` (Native DSP Plugin, JS↔DSP Communication, Chain Parameters) + `SPI_PROTOCOL.md` (audio format).
+Optional private notes (may not exist on your machine): local
+`schwung-wiki/patterns/dsp-patterns.md`, `schwung-wiki/gotchas/device-constraints.md`, BD-1200 notes.
 
 ## Audio format (fixed)
 
@@ -27,7 +28,17 @@ There are **three** DSP APIs. Exporting the wrong entry symbol = silent load fai
 | `audio_fx` | `audio_fx_api_v2_t` (api_version = 2) | `move_audio_fx_init_v2` |
 | `midi_fx` | `midi_fx_api_v1_t` (api_version = 1) | `move_midi_fx_init` |
 
-The module.json `api_version: 2` is separate from the DSP struct's `api_version` — the former gates multi-instance + Signal Chain, the latter identifies the ABI.
+Two `api_version`s exist and they are independent:
+
+- The module.json `api_version` field (optional, default 1 via `module_manager.c`) is a validation gate — the host accepts both 1 and 2 and rejects anything else. It does **not** select which init symbol the host probes.
+- The DSP struct's `api_version` field is the ABI version of the returned struct, and must match the init symbol you exported.
+
+Symbol selection rules:
+
+- **Host-level sound generators** — `module_manager.c` always probes `move_plugin_init_v2` first via `dlsym`, then falls back to `move_plugin_init_v1` if v2 is absent or its `create_instance` fails.
+- **Signal Chain slots** — the chain host (`src/modules/chain/dsp/chain_host.c`) picks the symbol from the slot's `component_type`: sound_generator ⇒ `move_plugin_init_v2`, audio_fx ⇒ `move_audio_fx_init_v2`, midi_fx ⇒ `move_midi_fx_init`.
+
+So in practice, just match your DSP's exported entry symbol to your `component_type` (see the table above). The `api_version` field in module.json can usually be omitted; set it to `2` if you want to be explicit about the struct you return. Freeverb is a real example of an `api_version: 1` module.json whose DSP exports `move_audio_fx_init_v2` — it works because the chain audio_fx loader doesn't consult `api_version` at all.
 
 ### Sound generator / audio FX (v2)
 ```c
@@ -66,9 +77,28 @@ midi_fx_api_v1_t* move_midi_fx_init(const host_api_v1_t *host);
 
 `process_midi` handles one incoming message and emits up to `max_out` outgoing messages; `tick` emits unsolicited messages on a timer.
 
-## Host pointer lifecycle
+## Host pointer lifetime
 
-The `host_api_v1_t *host` passed to `create_instance` / `_init` is **not guaranteed to outlive the call**. Use it immediately (e.g., `host->log("init")`) but do not store the bare pointer for later reference — access host facilities through the callbacks exposed on your own struct.
+The `host_api_v1_t *host` passed to `_init` (and forwarded to
+`create_instance` at startup) points to a member of the long-lived
+module-manager struct inside the host (`src/host/module_manager.c`
+constructs `mm->host_api` once and passes `&mm->host_api` for the life
+of the process). It is safe to store globally.
+
+Convention in-repo:
+
+```c
+static const host_api_v1_t *g_host = NULL;
+
+plugin_api_v2_t* move_plugin_init_v2(const host_api_v1_t *host) {
+    g_host = host;   /* freeverb, linein, wav_player, chain_host, velocity_scale all do this */
+    return &api;
+}
+```
+
+Don't call `host->log` from inside `render_block` / `process_midi` — not
+because the pointer is invalid, but because logging does fprintf
+under the hood (see `references/realtime.md`).
 
 ## Parameter bridge — `set_param` / `get_param`
 
@@ -147,7 +177,7 @@ These are load-bearing — see `references/realtime.md` for the full story:
 
 - No `fprintf`, `fopen`, file I/O in `render_block` / `process_midi`
 - No `malloc`/`new` in the hot path — pre-allocate in `create_instance`
-- `host->log("fmt", …)` is lock-free-ish but still ~1 ms per call; avoid in tight inner loops
+- `host->log(msg)` takes a single `const char *` (not variadic). It wraps `fprintf`, so it's **not** realtime-safe — never call it from `render_block`. For variadic formatting outside the hot path, use the `LOG_DEBUG(src, fmt, …)` macro family from `src/host/unified_log.h`, or `snprintf` into a buffer first and then pass to `host->log`.
 
 ## Debug
 

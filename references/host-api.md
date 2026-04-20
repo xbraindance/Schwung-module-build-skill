@@ -2,12 +2,15 @@
 
 **When to load:** calling into the host from `ui.js` (`host_*` functions), doing file I/O, recording, TTS, controlling modules, or implementing lifecycle hooks.
 
-## Wiki first
-- `schwung-wiki/framework/api-entry-points.md` — JS entry symbols, host callbacks
-- `schwung-wiki/patterns/state-serialization.md` — `host_module_get/set_param`, UI↔DSP round-trip
-- `schwung-wiki/gotchas/device-constraints.md` — filesystem layout, `/tmp` trap
+## Authoritative upstream
+- `docs/API.md` — Host Functions, Module Management, File System Utilities, Sampler, Screen Reader, System Commands
+  — https://github.com/charlesvestal/schwung/blob/main/docs/API.md
+- Host bindings registered in `src/schwung_host.c` (search for `JS_NewCFunction`)
 
-Authoritative: `schwung-main/docs/API.md` (Host Functions, Module Management, File System Utilities, Sampler, Screen Reader, System Commands).
+Optional private notes (may not exist on your machine):
+`schwung-wiki/framework/api-entry-points.md`,
+`schwung-wiki/patterns/state-serialization.md`,
+`schwung-wiki/gotchas/device-constraints.md`.
 
 ## Filesystem rule (load-bearing)
 
@@ -125,7 +128,7 @@ Overtake modules must init LEDs progressively (≤ 8/frame) to avoid MIDI buffer
 - Unload is asynchronous — don't assume `tick()` stops on the same frame as `host_unload_module()`.
 - `host_exit_module()` is **only dynamically bound for tool modules**; calling it elsewhere crashes the host.
 - `host_rescan_modules()` is not free (~100 ms) — call from idle input, never every tick.
-- Per-module exit hooks: `schwung-main/docs/plans/2026-03-28-per-module-exit-hooks.md`.
+- Per-module exit hooks: upstream `docs/plans/2026-03-28-per-module-exit-hooks.md` (if still present in main).
 
 ## Common mistakes
 

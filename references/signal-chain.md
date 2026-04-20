@@ -2,27 +2,31 @@
 
 **When to load:** making a module chainable, exposing `chain_params` or `ui_hierarchy`, writing `ui_chain.js`, or debugging "my module doesn't appear in the chain picker" / "knob doesn't map to my param".
 
-## Wiki first
-- `schwung-wiki/framework/signal-chain-integration.md` — chain_params, state persistence, patches
-- `schwung-wiki/gotchas/module-loading-failures.md` — chainable declaration mismatches
-- BD-1200: `implementation/bd1200-signal-chain.md` — 10-step rendering pipeline (~2.5 % CPU reference implementation)
+## Authoritative upstream
+- `docs/MODULES.md` → Chain Parameters, Signal Chain UI Shims, Shadow UI Parameter Hierarchy
+  — https://github.com/charlesvestal/schwung/blob/main/docs/MODULES.md
+- Chain host: `src/modules/chain/dsp/chain_host.c`, `src/modules/chain/ui.js`
+- Reference chainable DSP: `src/modules/audio_fx/freeverb/freeverb.c` + `ui_chain.js`
 
-Authoritative: `schwung-main/docs/MODULES.md` → Chain Parameters, Signal Chain UI Shims, Shadow UI Parameter Hierarchy.
+Optional private notes (may not exist on your machine):
+`schwung-wiki/framework/signal-chain-integration.md`,
+`schwung-wiki/gotchas/module-loading-failures.md`,
+`BD-1200/implementation/bd1200-signal-chain.md`.
 
 ## Making a module chainable
 
-`chainable: true` must appear in **both** places in `module.json`:
+Declare `chainable: true` inside `capabilities`:
 
 ```json
 {
-  "chainable": true,
   "capabilities": {
-    "chainable": true
+    "chainable": true,
+    "component_type": "audio_fx"
   }
 }
 ```
 
-Omit either and the module loads but silently doesn't appear in the chain picker. This is the #1 Signal Chain bug.
+This is the only location the chain UI reads (`src/modules/chain/ui.js` checks `mod.capabilities.chainable`). A top-level `chainable` field is ignored. Every built-in chainable module (freeverb, chord, arp, velocity_scale, linein) uses only the nested form.
 
 ## `chain_params` — the DSP-side knob map
 
@@ -102,7 +106,7 @@ If your chain params include enum values that the user added at runtime (custom 
 
 | Symptom | Likely cause |
 |---|---|
-| Module missing from chain picker | `chainable` in only one of the two required locations |
+| Module missing from chain picker | `chainable` missing inside `capabilities`, or `component_type` in capabilities doesn't match a chain slot type |
 | Knob doesn't map / does nothing | `chain_params` key doesn't exactly match `set_param` key |
 | `ui.js` behaviour shows up in chain (wrong UI) | You forgot `ui_chain.js`, or overrode `globalThis.init` in it |
 | Abbrev truncated in slot view | `abbrev` > 6 chars |

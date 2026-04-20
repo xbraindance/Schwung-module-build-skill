@@ -12,8 +12,13 @@ Build and troubleshoot **Schwung modules** for Ableton Move. Dev loop: write →
 
 1. **Pick the integration area(s)** from the table below — most module tasks span 2-3.
 2. **Read the matching `references/*.md`** file(s) before writing code. They are small on purpose.
-3. **Follow the wiki links inside each reference** — the wikis hold verified patterns from production modules. Don't re-derive what's already written down.
-4. Source-of-truth docs live under `/Users/click/Desktop/Move/schwung-main/docs/`. Only open those when a reference file says "authoritative: ..." or the wikis disagree.
+3. Each reference points to the upstream authoritative files (headers,
+   `docs/*.md`, reference modules). When in doubt, read the source in
+   the Schwung repo at https://github.com/charlesvestal/schwung rather
+   than trusting summaries.
+4. Optional private notes (local `schwung-wiki/`, `BD-1200/` trees) may
+   be referenced in places — they are supplementary and may not exist
+   on your machine. Skip them if absent.
 
 ## Task → Reference map
 
@@ -31,22 +36,21 @@ Build and troubleshoot **Schwung modules** for Ableton Move. Dev loop: write →
 
 ## Knowledge base
 
-### Schwung Wiki — `/Users/click/Desktop/Move/schwung-wiki/`
-Start at `index.md`. Relevant subdirs:
+### Primary (always available)
+- Upstream repo: https://github.com/charlesvestal/schwung
+  - `docs/MODULES.md`, `docs/API.md`, `docs/SPI_PROTOCOL.md`,
+    `docs/LOGGING.md`, `docs/REALTIME_SAFETY.md`, `docs/MIDI_INJECTION.md`
+  - `CLAUDE.md` at repo root — host + module architecture summary
+  - `src/host/` headers for ABI contracts
+  - `src/modules/` for reference implementations
 
-| Subdir | Holds |
-|---|---|
-| `framework/` | module.json rules, API entry points, deploy patterns, signal chain integration, UI options |
-| `patterns/` | DSP, UI, UI hierarchy, state serialization, MIDI handling, enums, print color codes |
-| `gotchas/` | deployment paths, module loading failures, device constraints, build issues |
-| `modules/` | Per-module status notes (BD-950, BD-Chord-Flow, BD-crusher, BD-stretch) |
-| `features/` | Remote UI, Schwung Manager, audio perf, line-in, link interception |
+### Optional private notes (may not be present on your machine)
+- Local `schwung-wiki/` — framework/patterns/gotchas/modules/features
+- Local `BD-1200/bd-1200-wiki/` — deep SP-1200 emulation notes
 
-### BD-1200 Wiki — `/Users/click/Desktop/Move/BD-1200/bd-1200-wiki/`
-Deep SP-1200 emulation. `circuits/`, `dsp/`, `filters/`, `hardware/`, `implementation/`, `tuning/`. Start at `index.md`.
-
-### Wiki write protocol
-Before adding knowledge to either wiki, read its `schema.md` and follow QUERY/INGEST/COMPILE from the wiki's `claude.md` / `CLAUDE.md`. Append to `log.md` after writes. Wiki knowledge is static — no auto-sync with upstream.
+These were created by one contributor and aren't checked in anywhere
+public. If a reference file points into them and you don't have them,
+go to the upstream source file instead.
 
 ## Prerequisites
 
@@ -55,14 +59,15 @@ Claude Code · Ableton Move reachable on network · SSH configured (`ssh ableton
 ## Universal checklist (applies to every module)
 
 - [ ] `module.json` is valid JSON — no comments, double-quoted keys, lowercase booleans, no trailing commas, ≤8 KB
-- [ ] `api_version: 2`, `builtin: false`, correct `component_type`
-- [ ] If chainable: `chainable: true` declared at **both** top level **and** inside `capabilities`
+- [ ] Correct `component_type` (drives install path + DSP entry symbol)
+- [ ] `api_version: 2` if your DSP exports the v2 entry symbols; `1` (or omitted) if v1
+- [ ] If chainable: `chainable: true` inside `capabilities` (top-level `chainable` is not read)
 - [ ] `ui.js` exports `init`, `tick`, `onMidiMessageInternal`, `onMidiMessageExternal`
 - [ ] `shouldFilterMessage()` called at top of `onMidiMessageInternal` (unless `raw_midi: true`)
 - [ ] Display cleared in `init()`; Back button (CC 51) handled
 - [ ] All file I/O under `/data/UserData/` — never `/tmp`
-- [ ] DSP `process()` has no `fprintf`, no allocation, no file I/O
-- [ ] Tool modules call `host_exit_module()` on Back
+- [ ] DSP `render_block` / `process_midi` has no `fprintf`, no `host->log`, no allocation, no file I/O
+- [ ] Tool modules call `host_exit_module()` on Back (non-tool modules must not call it)
 - [ ] Overtake modules init LEDs progressively (≤8 LEDs/frame)
 
 ## Quick commands
@@ -95,5 +100,5 @@ open http://move.local:7700
 ## External links
 
 - Schwung upstream: https://github.com/charlesvestal/schwung
+- Upstream docs: https://github.com/charlesvestal/schwung/tree/main/docs
 - This skill repo: https://github.com/xbraindance/Schwung-Module-Creator-skill
-- Source-of-truth docs: `/Users/click/Desktop/Move/schwung-main/docs/`

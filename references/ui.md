@@ -2,14 +2,19 @@
 
 **When to load:** writing or fixing anything that draws on the 128×64 display, handles encoders/pads/buttons, implements menus, or lives in `ui.js` / `ui_chain.js`.
 
-## Wiki first
-- `schwung-wiki/patterns/ui-patterns.md` — 128×64 layout, knob handling, menu patterns
-- `schwung-wiki/patterns/ui-hierarchy-patterns.md` — direct nav vs preset browser idioms
-- `schwung-wiki/patterns/print-color-codes.md` — color constants the `print()` API accepts
-- `schwung-wiki/framework/ui-customization-options.md` — Shadow UI vs custom `ui.js` tradeoffs
-- BD-1200: `implementation/ui-rendering-architecture.md` — two-layer model (C++ `ui_hierarchy` + JS `ui.js`)
+## Authoritative upstream
+- `docs/MODULES.md` (JavaScript UI, Menu System, Signal Chain UI Shims)
+  — https://github.com/charlesvestal/schwung/blob/main/docs/MODULES.md
+- `docs/API.md` (Display, Menu Layout Helpers)
+- Reference UI modules: `src/modules/chain/ui.js`, `src/modules/store/ui.js`
+- Shared helpers: `src/shared/menu_layout.mjs`, `menu_nav.mjs`, `input_filter.mjs`, `constants.mjs`
 
-Authoritative: `schwung-main/docs/MODULES.md` (JavaScript UI, Menu System, Signal Chain UI Shims), `API.md` (Display, Menu Layout Helpers).
+Optional private notes (may not exist on your machine):
+`schwung-wiki/patterns/ui-patterns.md`,
+`schwung-wiki/patterns/ui-hierarchy-patterns.md`,
+`schwung-wiki/patterns/print-color-codes.md`,
+`schwung-wiki/framework/ui-customization-options.md`,
+`BD-1200/implementation/ui-rendering-architecture.md`.
 
 ## Entry points `ui.js` must export
 
